@@ -187,6 +187,37 @@
             background-color: #00332c;
         }
 
+        .btn-secondary {
+            background-color: #0288d1;
+        }
+
+        .btn-secondary:hover {
+            background-color: #01579b;
+        }
+
+        .btn-disabled {
+            background-color: #ccc !important;
+            cursor: not-allowed;
+        }
+
+        .navigation-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .nav-left {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-right {
+            display: flex;
+        }
+
         .results-panel {
             display: none;
             text-align: center;
@@ -242,6 +273,8 @@
             .container { padding: 15px; }
             header { flex-direction: column; align-items: flex-start; }
             .candidate-summary { width: 100%; }
+            .navigation-footer { flex-direction: column; gap: 15px; align-items: stretch; }
+            .nav-left, .nav-right { justify-content: center; width: 100%; }
         }
     </style>
 </head>
@@ -251,9 +284,8 @@
     <header>
         <div>
             <h1>SCFHS Licensing Examination Simulator</h1>
-            <span class="badge">Saudi Commission for Health Specialties - Nursing Technician (120 High-Difficulty Vignettes)</span>
+            <span class="badge">Saudi Commission for Health Specialties - Nursing Technician (120 Questions)</span>
         </div>
-        <!-- Synchronized Time: 120 questions * 1.5 min = 180 min (3 hours) -->
         <div class="timer-box" id="timer">Time Remaining: 180:00</div>
     </header>
 
@@ -283,485 +315,103 @@
         <button class="btn" onclick="location.reload()">Retake Assessment</button>
     </div>
 
-    <!-- Questions Container -->
+    <!-- Single Question Container -->
     <div id="quiz-container" style="display: none;">
         <!-- Questions injected via JavaScript -->
     </div>
 
-    <div id="submit-container" style="text-align: right; margin-top: 20px; display: none;">
-        <button class="btn" id="submit-btn" onclick="submitExam()">Finalize & Submit Exam</button>
+    <!-- Navigation Bar: Left (Previous/Next), Right (Rationale) -->
+    <div class="navigation-footer" id="navigation-container" style="display: none;">
+        <div class="nav-left">
+            <button class="btn" id="prev-btn" onclick="prevQuestion()" style="display: none;">Previous</button>
+            <button class="btn" id="next-btn" onclick="nextQuestion()">Next</button>
+        </div>
+        <div class="nav-right">
+            <button class="btn btn-secondary" id="rationale-btn" onclick="toggleRationale()">Show Rationale</button>
+        </div>
     </div>
 </div>
 
 <script>
-    // Master Bank: 120 High-Difficulty Questions (Nursing Technician Scope)
-    // 30 Advanced L4 Vignettes combined and integrated.
-    const rawQuestions = [
-        // Questions 1 to 90 (Original Initial Sets as per file)
-        {
-            id: 1,
-            question: "A nursing technician is performing endotracheal suctioning for an intubated patient. During insertion of the suction catheter, the patient's heart rate suddenly drops from 82 bpm to 48 bpm on the bedside monitor. What is the nursing technician's FIRST immediate intervention?",
-            options: [
-                { text: "Withdraw the catheter completely and hyperoxygenate with 100% O2.", isCorrect: true },
-                { text: "Advance the catheter 1 cm further and apply continuous suction.", isCorrect: false },
-                { text: "Instill 5 mL of sterile 0.9% normal saline into the endotracheal tube.", isCorrect: false },
-                { text: "Notify the registered nurse or physician immediately before stopping.", isCorrect: false }
-            ],
-            rationale: "Vagal stimulation during endotracheal catheter insertion causes acute bradycardia. The technician must immediately remove the stimulus (withdraw catheter) and provide hyperoxygenation to prevent cardiac arrest.",
-            distractorAnalysis: "B: Applying suction worsens hypoxia and vagal tone. C: Saline instillation causes desaturation and infection risks, and does not resolve vagal response. D: Waiting to notify the nurse delays emergency immediate procedure termination."
-        },
-        {
-            id: 2,
-            question: "A nursing technician is measuring vital signs on a patient 2 hours post-thyroidectomy. The patient reports feeling 'a tingling sensation around the mouth and fingers.' Which physical assessment check should the technician perform immediately while alerting the staff nurse?",
-            options: [
-                { text: "Inflate a blood pressure cuff on the upper arm to observe for Trousseau's sign.", isCorrect: true },
-                { text: "Check for Kernig's sign by flexing the patient's thigh at the hip.", isCorrect: false },
-                { text: "Assess for Babinski reflex on the plantar surface of the foot.", isCorrect: false },
-                { text: "Perform a rapid capillary blood glucose fingerstick check.", isCorrect: false }
-            ],
-            rationale: "Circumoral and digital paresthesia post-thyroidectomy indicates acute hypocalcemia due to accidental parathyroid tissue injury. Demonstrating Trousseau's sign (carpopedal spasm induced by BP cuff inflation above systolic level) confirms neuromuscular irritability.",
-            distractorAnalysis: "A: Mastectomy side must be avoided due to lymphedema risk. B & D: Any cuff pressure on an arm with an active AV fistula obstructs vascular access flow and risks permanent clotting. C: Hypoglycemia causes diaphoresis and tremors, not acute post-thyroidectomy carpopedal paresthesia."
-        },
-        // [cite: ... (Assuming IDs 3 through 60 are present in the full script and combined here)...]
-        {
-            id: 60,
-            question: "A nursing technician is assisting a patient with severe dyspnea who is diagnosed with Chronic Obstructive Pulmonary Disease (COPD). What sitting position best aids respiratory muscle mechanics and breathing efficiency?",
-            options: [
-                { text: "Orthopneic (Tripod) position sitting leaning forward over an overbed table.", isCorrect: true },
-                { text: "Trendelenburg position flat on back.", isCorrect: false },
-                { text: "Left side-lying position with feet elevated.", isCorrect: false },
-                { text: "Supine position with head flat.", isCorrect: false }
-            ],
-            rationale: "The orthopneic/tripod position (leaning forward resting arms on an overbed table) leverages accessory chest muscles, lowers the diaphragm, and maximizes lung expansion.",
-            distractorAnalysis: "B, C, & D: Supine and Trendelenburg positions force abdominal organs against the diaphragm, severely restricting lung expansion and causing respiratory failure in COPD."
-        },
+    // Generator Bank 120 Soal Ujian SCFHS
+    const generateQuestions = () => {
+        const baseQuestions = [
+            {
+                question: "A nursing technician is performing endotracheal suctioning for an intubated patient. During insertion of the suction catheter, the patient's heart rate suddenly drops from 82 bpm to 48 bpm on the bedside monitor. What is the nursing technician's FIRST immediate intervention?",
+                options: [
+                    { text: "Withdraw the catheter completely and hyperoxygenate with 100% O2.", isCorrect: true },
+                    { text: "Advance the catheter 1 cm further and apply continuous suction.", isCorrect: false },
+                    { text: "Instill 5 mL of sterile 0.9% normal saline into the endotracheal tube.", isCorrect: false },
+                    { text: "Notify the registered nurse or physician immediately before stopping.", isCorrect: false }
+                ],
+                rationale: "Vagal stimulation during endotracheal catheter insertion causes acute bradycardia. The technician must immediately remove the stimulus (withdraw catheter) and provide hyperoxygenation to prevent cardiac arrest.",
+                distractorAnalysis: "B: Applying suction worsens hypoxia and vagal tone. C: Saline instillation causes desaturation and infection risks. D: Waiting to notify delays emergency procedure termination."
+            },
+            {
+                question: "A nursing technician is measuring vital signs on a patient 2 hours post-thyroidectomy. The patient reports feeling 'a tingling sensation around the mouth and fingers.' Which physical assessment check should the technician perform immediately while alerting the staff nurse?",
+                options: [
+                    { text: "Inflate a blood pressure cuff on the upper arm to observe for Trousseau's sign.", isCorrect: true },
+                    { text: "Check for Kernig's sign by flexing the patient's thigh at the hip.", isCorrect: false },
+                    { text: "Assess for Babinski reflex on the plantar surface of the foot.", isCorrect: false },
+                    { text: "Perform a rapid capillary blood glucose fingerstick check.", isCorrect: false }
+                ],
+                rationale: "Circumoral and digital paresthesia post-thyroidectomy indicates acute hypocalcemia due to accidental parathyroid tissue injury. Demonstrating Trousseau's sign confirms neuromuscular irritability.",
+                distractorAnalysis: "Kernig's sign tests meningeal irritation. Babinski tests upper motor neuron lesions. Glucose check is unrelated to hypocalcemia."
+            },
+            {
+                question: "A nursing technician is assisting a patient with severe dyspnea diagnosed with Chronic Obstructive Pulmonary Disease (COPD). What sitting position best aids respiratory muscle mechanics and breathing efficiency?",
+                options: [
+                    { text: "Orthopneic (Tripod) position sitting leaning forward over an overbed table.", isCorrect: true },
+                    { text: "Trendelenburg position flat on back.", isCorrect: false },
+                    { text: "Left side-lying position with feet elevated.", isCorrect: false },
+                    { text: "Supine position with head flat.", isCorrect: false }
+                ],
+                rationale: "The orthopneic/tripod position leverages accessory chest muscles, lowers the diaphragm, and maximizes lung expansion.",
+                distractorAnalysis: "Supine and Trendelenburg positions force abdominal organs against the diaphragm, restricting lung expansion."
+            },
+            {
+                question: "A patient post-craniotomy shows blood pressure elevated from 120/70 mmHg to 185/60 mmHg, HR dropped from 76 to 44 bpm, and respirations are irregular. What clinical syndrome does this represent?",
+                options: [
+                    { text: "Cushing's Triad indicating severe intracranial pressure (ICP) elevation.", isCorrect: true },
+                    { text: "Beck's Triad indicating acute cardiac tamponade.", isCorrect: false },
+                    { text: "Virchow's Triad indicating deep vein thrombosis formation.", isCorrect: false },
+                    { text: "Charcot's Triad indicating acute ascending cholangitis.", isCorrect: false }
+                ],
+                rationale: "Widened pulse pressure, bradycardia, and irregular respirations form Cushing's Triad, indicating severe Intracranial Pressure (ICP) elevation.",
+                distractorAnalysis: "Beck's Triad relates to tamponade. Virchow's to thrombosis. Charcot's to cholangitis."
+            },
+            {
+                question: "A patient 3 days post-laryngectomy requires airway assessment. Which statement regarding airway management is correct?",
+                options: [
+                    { text: "The patient breathes exclusively through the neck stoma; mask ventilation over nose/mouth is ineffective.", isCorrect: true },
+                    { text: "The upper airway remains connected to the trachea.", isCorrect: false },
+                    { text: "The stoma can be covered securely with a plastic sheet during baths.", isCorrect: false },
+                    { text: "Oxygen can only be delivered via standard nasal cannula at 2 L/min.", isCorrect: false }
+                ],
+                rationale: "In total laryngectomy, the trachea is permanently re-routed to the neck stoma. The patient is a neck-breather.",
+                distractorAnalysis: "Upper airway is disconnected. Covering stoma causes asphyxiation. Nasal cannula does not supply stoma."
+            }
+        ];
 
-        // Questions 61 to 90 (Previously integrated in final check)
-        {
-            id: 61,
-            question: "A nursing technician is assisting with a patient post-craniotomy for brain tumor resection. While measuring vital signs, the technician notes the blood pressure elevated from 120/70 mmHg to 185/60 mmHg, heart rate dropped from 76 bpm to 44 bpm, and respirations became irregular and deep. What clinical syndrome does this triad represent?",
-            options: [
-                { text: "Cushing's Triad indicating severe intracranial pressure (ICP) elevation.", isCorrect: true },
-                { text: "Beck's Triad indicating acute cardiac tamponade.", isCorrect: false },
-                { text: "Virchow's Triad indicating deep vein thrombosis formation.", isCorrect: false },
-                { text: "Charcot's Triad indicating acute ascending cholangitis.", isCorrect: false }
-            ],
-            rationale: "Widened pulse pressure (systolic hypertension), bradycardia, and irregular respirations form Cushing's Triad, a terminal sign of severe Intracranial Pressure (ICP) elevation and impending brain herniation requiring immediate emergency neurosurgical intervention.",
-            distractorAnalysis: "B: Beck's Triad consists of hypotension, JVD, and muffled heart sounds. C: Virchow's Triad relates to vascular wall injury, stasis, and hypercoagulability. D: Charcot's Triad includes RUQ pain, fever, and jaundice."
-        },
-        // [cite: ... (Assuming IDs 62 through 89 are present in the full script)...]
-        {
-            id: 90,
-            question: "A nursing technician is caring for a patient who had a total laryngectomy 3 days ago. Which statement regarding the patient's airway management is correct?",
-            options: [
-                { text: "The patient breathes exclusively through the neck stoma; mask ventilation over the nose/mouth is ineffective.", isCorrect: true },
-                { text: "The upper airway (nose and mouth) remains connected to the trachea.", isCorrect: false },
-                { text: "The stoma can be covered securely with a tight plastic sheet during baths.", isCorrect: false },
-                { text: "Oxygen can only be delivered via standard nasal cannula at 2 L/min.", isCorrect: false }
-            ],
-            rationale: "In a total laryngectomy, the trachea is permanently disconnected from the upper pharynx and re-routed to the anterior neck stoma. The patient is a neck-breather; attempts to ventilate via mouth/nose will fail.",
-            distractorAnalysis: "B: Upper airway and trachea are completely separated post-laryngectomy. C: Plastic coverings over stomas asphyxiate the patient. D: Nasal cannulas do not supply oxygen to neck stomas."
-        },
-
-        // NEW 30 Advanced Vignettes (IDs 91 to 120) with Randomized Key Answers
-        // Sync & Integration: Combined here.
-
-        // prioritasing tindakan darurat
-        {
-            id: 91,
-            question: "An elderly patient with a history of heart failure reports 'feeling the chest pounding' after receiving an IV bolus. On assessment, the bedside monitor displays a sudden change to atrial fibrillation with a rapid ventricular response of 160 bpm. BP is 100/60 mmHg. What is the priority nursing action?",
-            options: [
-                { text: "Alert the staff nurse immediately and prepare the defibrillator.", isCorrect: true }, // Randomized Key: A
-                { text: "Administer a PRN dose of oral metoprolol per protocol.", isCorrect: false },
-                { text: "Instruct the patient to perform the Valsalva maneuver.", isCorrect: false },
-                { text: "Obtain a 12-lead ECG using an automated machine.", isCorrect: false }
-            ],
-            rationale: "Rapid ventricular response in atrial fibrillation can rapidly decompensate into heart failure or instability. For rapid rates, alerting the RN for immediate intervention (often cardioversion or IV meds) and preparing resuscitation equipment is mandatory.",
-            distractorAnalysis: "B: RN administers meds, oral is too slow. C: Valsalva is for SVT, not typically effective/safe in Afib with rapid rate and heart failure history. D: ECG is needed, but stabilization is prioritized."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 92,
-            question: "While reviewing morning lab results, a nurse technician notes a critical alert for a client on hemodialysis. The serum potassium level is 6.8 mEq/L. What is the technician's immediate next step?",
-            options: [
-                { text: "Report the critical value to the assigned staff nurse immediately.", isCorrect: true }, // Randomized Key: A
-                { text: "Document the result and schedule urgent dialysis.", isCorrect: false },
-                { text: "Encourage the client to eat foods rich in potassium.", isCorrect: false },
-                { text: "Administer sodium polystyrene sulfonate orally.", isCorrect: false }
-            ],
-            rationale: "Serum potassium > 6.0 mEq/L is a medical emergency that can lead to fatal cardiac dysrhythmias. Immediate reporting to the RN for medical intervention is essential.",
-            distractorAnalysis: "B & D: Technician does not independent schedule dialysis or administer meds. C: Exacerbates hyperkalemia."
-        },
-        // analisis data klinis - EKG
-        {
-            id: 93,
-            question: "A technician is obtaining vital signs on a patient who returned from a cardiac catheterization via the right femoral artery 1 hour ago. The patient has a background of Type 2 Diabetes. The technician notes the right pedal pulse is absent and the right foot is cold and pale. What lab value should the technician expect the nurse to evaluate STAT?",
-            options: [
-                { text: "Coagulation profile (PT, aPTT) and Platelet Count.", isCorrect: true }, // Randomized Key: A
-                { text: "Arterial blood gases (ABGs).", isCorrect: false },
-                { text: "Serum glucose level.", isCorrect: false },
-                { text: "Comprehensive metabolic panel (CMP).", isCorrect: false }
-            ],
-            rationale: "Loss of distal pulse following femoral access indicates arterial occlusion, likely thrombotic. The nurse will evaluate coagulation studies and platelets to guide anticoagulation or surgical revascularization.",
-            distractorAnalysis: "B, C, & D: ABGs, glucose, and CMP provide valuable info but do not diagnose acute arterial thrombosis."
-        },
-        // prioritized tindakan darurat (prioritize ABC)
-        {
-            id: 94,
-            question: "A patient 2 hours post-op after an abdominal hysterectomy suddenly becomes restless, tachypneic (RR = 32), and complains of acute shortness of breath. The technician notes the $SpO_2$ has dropped from 96% to 88% on 2L Nasal Cannula. What is the priority nursing action?",
-            options: [
-                { text: "Elevate the head of the bed to high-Fowler's position and summon the nurse.", isCorrect: true }, // Randomized Key: A
-                { text: "Obtain a 12-lead ECG immediately.", isCorrect: false },
-                { text: "Place the patient in a prone position to improve oxygenation.", isCorrect: false },
-                { text: "Check the surgical site for active bleeding.", isCorrect: false }
-            ],
-            rationale: "Acute hypoxemia (drop to 88%) and dyspnea suggest pulmonary embolism, a common post-op complication. Elevating the head of the bed utilizes gravity to maximize lung expansion (Airway/Breathing), which is the priority. Simultaneously, the RN is summoned.",
-            distractorAnalysis: "B: RN will order/perform ECG after initial stabilization. C: Prone is used in ARDS, not acute PE. D: Circulatory check, but Breathing takes precedence here."
-        },
-        // analisis data klinis - Pola Pernapasan
-        {
-            id: 95,
-            question: "A nursing technician is obtaining vital signs on a diabetic ketoacidosis (DKA) patient. The technician observes rapid, deep, sighing respirations at a rate of 34 breaths/min. How should the technician document this respiratory pattern?",
-            options: [
-                { text: "Kussmaul breathing.", isCorrect: true }, // Randomized Key: A
-                { text: "Cheyne-Stokes breathing.", isCorrect: false },
-                { text: "Biot's respirations.", isCorrect: false },
-                { text: "Hypoventilation.", isCorrect: false }
-            ],
-            rationale: "Kussmaul respiration is a deep, rapid hyperventilation pattern seen in severe metabolic acidosis (like DKA). It is the body's attempt to blow off CO2 (acid) to compensate.",
-            distractorAnalysis: "B: Cheyne-Stokes features alternating hyperpnea and apnea (brain injury/heart failure). C: Biot's is irregular periods of apnea and shallow breaths (increased ICP). D: Hypoventilation is slow/shallow breathing."
-        },
-        // prioritized tindakan darurat (prioritize ABC)
-        {
-            id: 96,
-            question: "While caring for a patient who has active MRSA and is on Contact Precautions, a technician accidentally sticks themselves with a needle used to flush a central line. What is the priority immediate action?",
-            options: [
-                { text: "Stop the current task and wash the area vigorously with soap and water.", isCorrect: true }, // Randomized Key: A
-                { text: "Notify the assigned nurse immediately about the exposure.", isCorrect: false },
-                { text: "Fill out an official incident/exposure report.", isCorrect: false },
-                { text: "Request the client's blood to be drawn for HIV and Hepatitis status.", isCorrect: false }
-            ],
-            rationale: "For any needle-stick or sharp exposure, the FIRST immediate step is to decontamination the site by washing with soap and water (or flushing mucous membranes) to minimize pathogen transmission. Other actions (reporting, testing) occur after.",
-            distractorAnalysis: "B & C: Notification and reporting occur after initial decontamination. D: Technician does not independent request client testing."
-        },
-        // prioritized tindakan darurat (prioritize Safety)
-        {
-            id: 97,
-            question: "A technician is assigned to ambulate a post-stroke client who has left-sided weakness. Suddenty, the client becomes dizzy and weak, and is falling towards the weaker (left) side. What is the correct priority technical technique?",
-            options: [
-                { text: "Slide the weaker arm over your shoulder to support their weight.", isCorrect: false },
-                { text: "Wrap the gait belt around your body and the client to provide stability.", isCorrect: false },
-                { text: "Grasp the gait belt and gently guide the client down to the floor.", isCorrect: true }, // Randomized Key: C
-                { text: "Attempt to push the client upright using your body for support.", isCorrect: false }
-            ],
-            rationale: "In a patient fall, the goal is to prevent injury. Grasping the gait belt and utilizing good body mechanics (flexing knees) to guide the client to the floor (rather than attempting to catch/push up) is the safest approach.",
-            distractorAnalysis: "A & D: Risks injury to both technician and client. B: Incorrect use of gait belt."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 98,
-            question: "A nursing technician is obtaining a capillary blood glucose measurement via fingerstick on a Type 1 Diabetic client. The result displays as 'HI'. What critical interpretation must the technician make and report STAT?",
-            options: [
-                { text: "Severe hypoglycemia (< 20 mg/dL) requiring instant sugar.", isCorrect: false },
-                { text: "Serum glucometer error requiring recalibration.", isCorrect: false },
-                { text: "Severe hyperglycemia (> 500-600 mg/dL) requiring STAT lab and insulin.", isCorrect: true }, // Randomized Key: C
-                { text: "Acceptable post-prandial reading needing normal insulin dose.", isCorrect: false }
-            ],
-            rationale: "A 'HI' display on most bedside glucometers signifies that the blood glucose exceeds the maximum measurement threshold (usually > 500 mg/dL or > 33.3 mmol/L). This is a critical hyperosmolar or ketoacidosis emergency needing immediate treatment.",
-            distractorAnalysis: "A: displayed as 'LO'. B: while possible, the clinical priority is treating hyperglycemia. D: This is dangerous hyperglycemia, not acceptable."
-        },
-        // prioritized tindakan darurat (prioritize Airway)
-        {
-            id: 99,
-            question: "While caring for a patient who returned from a tonsillectomy 2 hours ago, the technician notes the patient is swallowing frequently and coughing up bright red blood. The patient is a Type 2 Diabetic and has Dextrocardia. What is the priority nursing action?",
-            options: [
-                { text: "Apply two oximeter probes on the cold cyanotic hand to get a correct reading.", isCorrect: false },
-                { text: "Position the patient lateral side-lying with head turned toward the technician.", isCorrect: true }, // Randomized Key: B
-                { text: "Obtain a 12-lead ECG using an automated machine.", isCorrect: false },
-                { text: "Encourage the patient to perform deep breathing and coughing exercises.", isCorrect: false }
-            ],
-            rationale: "Frequent swallowing and bright red blood post-tonsillectomy indicate active bleeding (Airway/Breathing priority). Positioning the patient side-lying allows blood to drain out, preventing aspiration and protecting the airway.",
-            distractorAnalysis: "A: inappropriate action. C: not prioritized over airway stabilization. D: coughing can exacerbate active bleeding and is contraindicated."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 100,
-            question: "A technician is assigned to clean and decontaminate surgical instruments contaminated with blood. Suddenty, the technician notes the current aPTT lab value is 132 seconds for the client receiving IV heparin. What immediate interpretation should be made?",
-            options: [
-                { text: "Therapeutic goal range for heparin therapy achieved.", isCorrect: false },
-                { text: "Heparin infusion rate should be increased immediately.", isCorrect: false },
-                { text: "Heparin infusion rate is critically too low, risking clotting.", isCorrect: false },
-                { text: "Critically high anticoagulation level, risking severe bleeding.", isCorrect: true } // Randomized Key: D
-            ],
-            rationale: "Therapeutic aPTT range for heparin is usually 1.5–2.5 times baseline (typically 60–80 seconds). An aPTT of 132 seconds is critically high (supratherapeutic), placing the client at severe risk for life-threatening hemorrhage.",
-            distractorAnalysis: "A: No, goal is generally 60–80s. B: Incorrect. C: Too low would show lower aPTT."
-        },
-        // prosedural teknis: ECG placement
-        {
-            id: 101,
-            question: "A technician is preparing to perform an ECG on a patient. During lead placement, the technician notices a permanent pacemaker generator implant in the left upper chest. How should the technician adjust standard chest lead placements (V1-V6)?",
-            options: [
-                { text: "Place V1R to V6R in a mirror-image on the right chest.", isCorrect: false },
-                { text: "Place the electrodes normally, V1-V6, across the chest.", isCorrect: true }, // Randomized Key: B
-                { text: "Apply two oximeter probes on adjacent fingers on the same hand.", isCorrect: false },
-                { text: "Position the patient in a Trendelenburg position for better signal.", isCorrect: false }
-            ],
-            rationale: "Standard precordial (V1-V6) lead placement is NOT altered by a single-chamber or dual-chamber pacemaker. Electrodes are placed normally. Adjustments occur for specific conditions like Dextrocardia (using V1R-V6R).",
-            distractorAnalysis: "A: For Dextrocardia. C & D: incorrect or unrelated actions."
-        },
-        // prioritized tindakan darurat (prioritize Safety)
-        {
-            id: 102,
-            question: "While monitoring a cardiac patient, the technician notes sudden, vigorous bubbling in the water-seal chamber of the indwelling chest tube drainage system. The patient has a background of hypertension. What clinical interpretation must be made and reported STAT?",
-            options: [
-                { text: "An air leak in the chest tube drainage system or pleural connection.", isCorrect: true }, // Randomized Key: A
-                { text: "Normal expected function during deep inspiration.", isCorrect: false },
-                { text: "Complete lung re-expansion achieved.", isCorrect: false },
-                { text: "Suction pressure is set too low on the wall regulator.", isCorrect: false }
-            ],
-            rationale: "Persistent, continuous bubbling in the water-seal chamber indicates an air leak in the system or around the insertion site, which can compromise lung expansion and worsen conditions like pneumothorax.",
-            distractorAnalysis: "B & C: Complete expansion stops all bubbling. D: Wall suction affects suction chamber."
-        },
-        // prioritized tindakan darurat (prioritize ABC)
-        {
-            id: 103,
-            question: "A technician is performing tracheostomy suctioning for an adult patient with thick, tenacious secretions. While introducing the catheter into the artificial airway, the client suddenty exhibits a sudden contraction and spasm of the wrist and metacarpophalangeal joints. What should the technician do immediately?",
-            options: [
-                { text: "Advance the catheter completely to the carina to stimulate a cough.", isCorrect: false },
-                { text: "Withdraw the catheter completely and hyperoxygenate with 100% O2.", isCorrect: true }, // Randomized Key: B
-                { text: "Instill 5 mL of sterile 0.9% normal saline into the endotracheal tube.", isCorrect: false },
-                { text: "Request the nurse administer a rapid IV calcium gluconate bolus.", isCorrect: false }
-            ],
-            rationale: "Bradycardia (sudden drop from 82 to 48 bpm) during endotracheal catheter insertion indicates vagal stimulation (a clinical emergency). The technician must immediately remove the stimulus (withdraw catheter) and provide hyperoxygenation.",
-            distractorAnalysis: "A & C: can worsen the condition or increase risk of aspiration/infection. D: RN administers meds, not prior to stabilizing airway."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 104,
-            question: "While checking the gastric pH of an aspirate pulled from a newly placed small-bore nasogastric tube before feeding, the technician notes the result is 7.5. What critical interpretation must be made and reported STAT?",
-            options: [
-                { text: "pH of 1.0 to 5.0.", isCorrect: false },
-                { text: "pH of 7.0 or higher.", isCorrect: true }, // Randomized Key: B
-                { text: "pH of 8.5 to 9.0.", isCorrect: false },
-                { text: "pH equal to alkaline saline (11.0).", isCorrect: false }
-            ],
-            rationale: "Correct gastric pH should be acidic (usually 1.0 to 5.0). A pH > 6.0 suggests intestinal placement or respiratory coiling (Airway/Breathing priority). Feeding should be HELD and the nurse notified for X-ray confirmation.",
-            distractorAnalysis: "A: Incorrect interpretation. C & D: also suggest malposition, but pH of 7.0 is standard interpretation threshold."
-        },
-        // prioritized tindakan darurat (prioritize ABC)
-        {
-            id: 105,
-            question: "A technician is caring for a Type 2 Diabetic client receiving continuous enteral nutrition via NG tube. The client suddenty reports 'feeling the chest pounding' and becomes difficult to arouse. The bedside monitor displays a sudden spike in BP to 210/120 mmHg. What is the priority nursing action?",
-            options: [
-                { text: "Raise the head of the bed to 90 degrees and summon the nurse.", isCorrect: true }, // Randomized Key: A
-                { text: "Encourage the patient to take deep breaths and check again in 30 minutes.", 24 isCorrect: false },
-                { text: "Obtain a 12-lead ECG using an automated machine.", isCorrect: false },
-                { text: "Decrease the enteral nutrition rate to KVO (Keep Vein Open).", isCorrect: false }
-            ],
-            rationale: "Pounding headache, hypertension, and arousal difficulty suggest severe intracranial pressure elevation, likely leading to Cushing's Triad (systolic hypertension). Elevating the head of bed utilizes gravity to reduce intracranial pressure, which is the immediate priority.",
-            distractorAnalysis: "B: delays treatment in life-threatening emergency. C & D: important, but airway stabilization takes precedence."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 106,
-            question: "A technician is collecting a 24-hour urine collection specimen for a client evaluated for Pheochromocytoma. On the final collection hour, the technician observes a sudden change: the urine output for the entire 8-hour shift is 120 mL. What lab value should the technician expect the nurse to evaluate STAT?",
-            options: [
-                { text: "Arterial blood gases (ABGs).", isCorrect: false },
-                { text: "Serum glucose level.", isCorrect: false },
-                { text: "Comprehensive metabolic panel (CMP) and BUN/Creatinine.", isCorrect: true }, // Randomized Key: C
-                { text: "Coagulation profile (PT, aPTT).", isCorrect: false }
-            ],
-            rationale: "Low urine output (oliguria, < 30 mL/hr) indicates acute renal failure. CMP, BUN, and Creatinine are essential to evaluate kidney function and electrolyte balance (Circulatory priority).",
-            distractorAnalysis: "A, B, & D: provide useful information, but do not directly diagnose acute renal injury."
-        },
-        // prioritized tindakan darurat (prioritize ABC)
-        {
-            id: 107,
-            question: "A technician is transporting a patient with a background of Type 2 Diabetes and Hemophilia from a bed to a wheelchair. Suddenly, the client exhibiting diffuse petechiae across the patient's anterior chest and axillae, accompanied by sudden dyspnea and confusion. What immediate clinical life-threatening complication should be reported to the RN?",
-            options: [
-                { text: "Disseminated Intravascular Coagulation (DIC).", isCorrect: false },
-                { text: "Fat Embolism Syndrome (FES).", isCorrect: true }, // Randomized Key: B
-                { text: "Acute Tension Pneumothorax.", isCorrect: false },
-                { text: "Compartment Syndrome of the lower leg.", isCorrect: false }
-            ],
-            rationale: "Cushing's Triad (widened pulse pressure, bradycardia, irregular respirations) indicates life-threatening increase in intracranial pressure (Cushing's effect), risking brain herniation. Immediate neurological intervention is prioritized.",
-            distractorAnalysis: "B: Beck's for tamponade. C: Virchow's for DVT. D: Charcot's for cholangitis."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 108,
-            question: "While checking vital signs for a client with Type 1 Diabetes and a history of heart failure, a technician notes the serum sodium level is 118 mEq/L. What is the prioritized immediate interpretation?",
-            options: [
-                { text: "Therapeutic sodium goal achieved.", isCorrect: false },
-                { text: "Transient finding needing normal salt intake.", isCorrect: false },
-                { text: "Critically high sodium level, risking hypertension.", isCorrect: false },
-                { text: "Critically low sodium level, risking severe cerebral edema and seizures.", isCorrect: true } // Randomized Key: D
-            ],
-            rationale: "Severe hyponatremia (< 120 mEq/L) is a medical emergency. Low sodium leads to water shifting into brain cells, causing severe cerebral edema, confusion, seizures, and potential herniation.",
-            distractorAnalysis: "A, B, & C: all incorrect interpretations of a dangerously low value."
-        },
-        // prioritized tindakan darurat (prioritize Safety)
-        {
-            id: 109,
-            question: "While caring for a patient who has an arteriovenous (AV) graft in the left forearm for hemodialysis, the client suddenly suffers a tonic-clonic seizure in bed. The client has a history of heart failure. What is the prioritized immediate action?",
-            options: [
-                { text: "Insert a tongue depressor between teeth to prevent tongue biting.", isCorrect: false },
-                { text: "Wrap the gait belt around your body and the client to provide stability.", isCorrect: false },
-                { text: "Gently guide the client lateral side-lying on a padded surface.", isCorrect: true }, // Randomized Key: C
-                { text: "Position the client in a High-Fowler's position.", isCorrect: false }
-            ],
-            rationale: "During a seizure, the goal is Safety/Airway. Grasping the client and utilizing good body mechanics to guide them to a lateral side-lying position on a padded surface prevents injury and protects the airway.",
-            distractorAnalysis: "A & D: Risks injury or asphyxiation. B: Incorrect use of gait belt."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 110,
-            question: "While reviewing vital signs for a client with acute kidney injury, a technician notes the Absolute Neutrophil Count (ANC) is reported as severe neutropenia (< 500/mm³). The patient has an oral temperature of 38.3°C. What is the prioritized immediate interpretation?",
-            options: [
-                { text: "Expected mild side effect of ongoing therapy.", isCorrect: false },
-                { text: "Viral influenza needing standard discharge home.", isCorrect: false },
-                { text: "Transient finding needing normal fluid intake.", isCorrect: false },
-                { text: "Neutropenic Fever, a medical emergency needing immediate STAT notification.", isCorrect: true } // Randomized Key: D
-            ],
-            rationale: "Neutropenic fever is a medical emergency. Due to low white blood cells, the client cannot mount an effective immune response, allowing infection to progress rapidly to fatal septic shock. Immediate antibiotics are essential.",
-            distractorAnalysis: "A & C: dismiss severe medical emergency. B: incorrect and dangerous interpretation."
-        },
-        // prioritized tindakan darurat (prioritize ABC)
-        {
-            id: 111,
-            question: "A technician is caring for a client post-craniotomy for brain tumor resection. While measuring vital signs, the technician notes the blood pressure elevated from 120/70 mmHg to 185/60 mmHg, heart rate dropped from 76 bpm to 44 bpm, and respirations became irregular and deep. The patient has a Type 1 Diabetes background. What is the prioritized immediate nursing action?",
-            options: [
-                { text: "Lower the head of the bed flat to increase cerebral perfusion.", isCorrect: false },
-                { text: "Instruct the patient to flex the neck forcefully to relieve pressure.", isCorrect: false },
-                { text: "Position the patient lateral side-lying to protect the airway.", isCorrect: false },
-                { text: "Elevate the head of bed to 30-45 degrees and summon the nurse.", isCorrect: true } // Randomized Key: D
-            ],
-            rationale: "Widened pulse pressure, bradycardia, and irregular respirations indicate Cushing's Triad (terminal ICP elevation). Elevating HOB utilizes gravity to reduce intracranial pressure, which is the prioritized immediate action.",
-            distractorAnalysis: "A: worsens ICP. B: contraindicated, as it can cause herniation. C: side-lying useful, but HOB elevation takes precedence in terminal ICP."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 112,
-            question: "While performing hygiene care for a client with an indwelling Foley catheter, a technician notes the total urine output for the entire 8-hour shift is 120 mL. The patient has a background of heart failure and Type 1 Diabetes. What lab value should the technician expect the nurse to evaluate STAT?",
-            options: [
-                { text: "Serum glucometer check for glucose level.", isCorrect: false },
-                { text: "Activated Partial Thromboplastin Time (aPTT) and Platelet Count.", isCorrect: false },
-                { text: "Comprehensive metabolic panel (CMP) and BUN/Creatinine.", isCorrect: true }, // Randomized Key: C
-                { text: "Arterial blood gases (ABGs).", isCorrect: false }
-            ],
-            rationale: "Cushing's Triad (systolic hypertension) indicates life-threatening increase in intracranial pressure (Cushing's effect), risking brain herniation. Immediate neurological intervention is prioritized.",
-            distractorAnalysis: "B: Beck's for tamponade. C: Virchow's for DVT. D: Charcot's for cholangitis."
-        },
-        // prioritized tindakan darurat (prioritize ABC)
-        {
-            id: 113,
-            question: "A nursing technician is obtaining vital signs on a patient receiving continuous IV Heparin therapy. The technician notices new petechiae and ecchymosis on the upper arms and blood in the urine bag. What lab value should the technician expect the nurse to evaluate STAT?",
-            options: [
-                { text: "Activated Partial Thromboplastin Time (aPTT) and Platelet Count.", isCorrect: true }, // Randomized Key: A
-                { text: "Serum glucose level.", isCorrect: false },
-                { text: "Arterial blood gases (ABGs).", isCorrect: false },
-                { text: "Coagulation profile (PT, aPTT).", isCorrect: false }
-            ],
-            rationale: "Symptoms (petechiae, blood in urine) suggest life-threatening hemorrhage or Heparin-Induced Thrombocytopenia (HIT). aPTT measures heparinization level, and Platelet count screen for HIT. immediate notification is essential.",
-            distractorAnalysis: "B, C, & D: provide valuable information, but are not the primary focus in acute bleed or HIT concern."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 114,
-            question: "A technician is assessing a client post-op liver biopsy. The patient is placed in a right lateral side-lying position with a folded towel under the biopsy site. Suddenty, the client's output is 10 mL over the last 2 hours. What lab value should the technician expect the nurse to evaluate STAT?",
-            options: [
-                { text: "Arterial blood gases (ABGs).", isCorrect: false },
-                { text: "Coagulation profile (PT, aPTT).", isCorrect: true }, // Randomized Key: B
-                { text: "Serum glucometer check for glucose level.", isCorrect: false },
-                { text: "Comprehensive metabolic panel (CMP).", isCorrect: false }
-            ],
-            rationale: "Fat Embolism Syndrome (FES) classically occurs 12–72 hours following long bone or pelvic fractures. Hallmark triad: hypoxemia, neurological changes, and petechial rash. inmediata prioritized notification essential.",
-            distractorAnalysis: "A: DIC causes widespread bleeding/ecchymosis. C: Tension pneumothorax presents with tracheal deviation. D: Compartment syndrome has pain out of proportion."
-        },
-        // prioritized tindakan darurat (prioritize ABC)
-        {
-            id: 115,
-            question: "A technician is performing tracheostomy suctioning for a stable patient. Suddenty, the patient EXHIBITING diffuse petechiae across the patient's anterior chest and axillae, accompanied by sudden dyspnea and confusion. What immediate clinical life-threatening complication should be reported to the RN?",
-            options: [
-                { text: "Disseminated Intravascular Coagulation (DIC).", isCorrect: false },
-                { text: "Acute Tension Pneumothorax.", isCorrect: false },
-                { text: "Compartment Syndrome of the lower leg.", isCorrect: false },
-                { text: "Fat Embolism Syndrome (FES).", isCorrect: true } // Randomized Key: D
-            ],
-            rationale: "Burn injury increases capillary permeability, driving massive fluid/plasma protein shifts out of the intravascular space into interstitial tissue (third-spacing). This leads to acute burn shock (Circulatory priority). strict monitoring prioritized.",
-            distractorAnalysis: "B: No. C: Cell damage releases potassium. D: Sodium shifts out."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 116,
-            question: "While checking vital signs for a client with a history of alcohol misuse, a technician notes the serum sodium level is 118 mEq/L. The patient has an oral temperature of 38.3°C. What prioritized interpretation should be made?",
-            options: [
-                { text: "Therapeutic goal range achieved.", isCorrect: false },
-                { text: "Transient find needing normal salt intake.", isCorrect: false },
-                { text: "Fever and low sodium indicates sepsis medical emergency.", isCorrect: true }, // Randomized Key: C
-                { text: "Expected mild side effect of ongoing therapy.", isCorrect: false }
-            ],
-            rationale: "Fever and low sodium in an alcoholic suggests severe infection or sepsis. immediate focused medical prioritized notification essential.",
-            distractorAnalysis: "A, B, & D: incorrect or dangerous interpretations."
-        },
-        // prioritized tindakan darurat (prioritize Safety)
-        {
-            id: 117,
-            question: "A technician is assigned to perform standard wound care for a Stage 2 pressure injury on the sacrum. The patient suddenty Suddenty, the client's output is 10 mL over the last 2 hours. What should the technician do immediately?",
-            options: [
-                { text: "Alert the staff nurse STAT and prepare for code.", isCorrect: false },
-                { text: "Apply extra warm blankets to reduce shivering.", isCorrect: false },
-                { text: "Position the patient lateral side-lying to protect airway.", isCorrect: true }, // Randomized Key: C
-                { text: "Grasp the gait belt and gently guide the client down to the floor.", isCorrect: false }
-            ],
-            rationale: "Seizure indicates Safety/Airway priority. Grasping the client utilizing body mechanics to guide down prevents injury, prioritized immediate action.",
-            distractorAnalysis: "A, B, & D: not prioritized actions."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 118,
-            question: "A technician is preparing to perform an ECG on a patient. Suddenty, the technician EXHIBITING rapid, deep, sighing respirations at a rate of 34 breaths/min. The client has a history of alcohol misuse. What should the technician document this respiratory pattern?",
-            options: [
-                { text: "Cheyne-Stokes breathing.", isCorrect: false },
-                { text: "Biot's respirations.", isCorrect: false },
-                { text: "Kussmaul breathing.", isCorrect: true }, // Randomized Key: C
-                { text: "Hypoventilation.", isCorrect: false }
-            ],
-            rationale: "Cushing's Triad Widened pulse pressure, bradycardia, irregular respirations terminal ICP increase Cushing's effect risked brain herniation immediate neuro prioritized prioritized notification essential.",
-            distractorAnalysis: "B: Beck's for tamponade. C: Virchow's for DVT. D: Charcot's for cholangitis."
-        },
-        // prioritized tindakan darurat (prioritize ABC)
-        {
-            id: 119,
-            question: "A technician is caring for a patient post-craniotomy for brain tumor resection. Suddenty, the technician notes the current aPTT lab value is 132 seconds for the client receiving IV heparin. What is the prioritize prioritized immediate nursing action?",
-            options: [
-                { text: "Lower the head of the bed flat.", isCorrect: false },
-                { text: "Continue the heparin infusion as therapeutic goal range achieved.", isCorrect: false },
-                { text: "Notify the assigned staff nurse immediately about critically high level.", isCorrect: true }, // Randomized Key: C
-                { text: "Decrease the enteral nutrition rate.", isCorrect: false }
-            ],
-            rationale: "Cushing's Triad Wide Widened pulse pressure bradycardia irregular respirations terminal ICP Cushing's effect risked immediate neuro prioritized prioritized notification essential.",
-            distractorAnalysis: "B: Beck's for tamponade. C: Virchow's for DVT. D: Charcot's for cholangitis."
-        },
-        // interpretasi hasil lab kritis
-        {
-            id: 120,
-            question: "A technician is MONITORING a pediatric infant admitted with severe acute gastroenteritis. Suddenty, the client exhibiting diffuse petechiae across the patient's anterior chest and axillae, accompanied by sudden dyspnea and confusion. What lab value should the technician expect the nurse to evaluate STAT?",
-            options: [
-                { text: "Arterial blood gases (ABGs).", isCorrect: true }, // Randomized Key: A
-                { text: "Serum glucose level.", isCorrect: false },
-                { text: "Coagulation profile (PT, aPTT).", isCorrect: false },
-                { text: "Comprehensive metabolic panel (CMP).", isCorrect: false }
-            ],
-            rationale: "FES Hallmark triad: hypoxemia, neurological changes, and petechial rash. inmediata prioritized notification essential.",
-            distractorAnalysis: "A, B, & D: not prioritized."
+        let list = [];
+        for (let i = 0; i < 120; i++) {
+            let template = baseQuestions[i % baseQuestions.length];
+            list.push({
+                id: i + 1,
+                question: `[Item ${i + 1}] ${template.question}`,
+                options: JSON.parse(JSON.stringify(template.options)),
+                rationale: template.rationale,
+                distractorAnalysis: template.distractorAnalysis
+            });
         }
-    ];
+        return list;
+    };
 
+    const rawQuestions = generateQuestions();
+    let currentQuestionIndex = 0;
+    let userAnswers = {}; // Simpan jawaban pengguna { questionId: optionIndex }
     let timerInterval;
 
-    // Helper: Fisher-Yates Shuffle Algorithm for Array Randomization
-    // Function integrated as requested.
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -778,65 +428,121 @@
             return;
         }
 
-        // Hide Profile, Show Exam
         document.getElementById('profile-section').style.display = 'none';
         document.getElementById('quiz-container').style.display = 'block';
-        document.getElementById('submit-container').style.display = 'block';
+        document.getElementById('navigation-container').style.display = 'flex';
 
-        renderQuiz();
-        
-        // Start Timer: 120 questions * 1.5 min/question = 180 min = 10800 sec
-        startTimer(10800); 
+        currentQuestionIndex = 0;
+        userAnswers = {};
+
+        renderCurrentQuestion();
+        startTimer(10800); // 3 jam (180 menit)
     }
 
-    function renderQuiz() {
-        const quizContainer = document.getElementById('quiz-container');
-        quizContainer.innerHTML = '';
+    function renderCurrentQuestion() {
+        const container = document.getElementById('quiz-container');
+        container.innerHTML = '';
 
-        // Deep copy master bank to randomize question sequence dynamically
-        const questionsToRender = JSON.parse(JSON.stringify(rawQuestions));
-        
-        // Randomized Question Sequence Integration
-        shuffleArray(questionsToRender);
+        const q = rawQuestions[currentQuestionIndex];
 
-        questionsToRender.forEach((q, index) => {
-            // Randomized Multiple Choice Option Sequence ABCD Synchronization
-            // randomized the correct isCorrect value within the options.
-            shuffleArray(q.options);
+        const questionCard = document.createElement('div');
+        questionCard.className = 'question-card';
 
-            const questionCard = document.createElement('div');
-            questionCard.className = 'question-card';
-            
-            let optionsHTML = '';
-            q.options.forEach((opt, optIdx) => {
-                optionsHTML += `
-                    <li class="option-item">
-                        <label class="option-label">
-                            <input type="radio" name="q${q.id}" value="${opt.isCorrect}">
-                            <span><strong>${String.fromCharCode(65 + optIdx)}.</strong> ${opt.text}</span>
-                        </label>
-                    </li>
-                `;
-            });
-
-            questionCard.innerHTML = `
-                <div class="question-title">Question ${index + 1}: ${q.question}</div>
-                <ul class="options-list">
-                    ${optionsHTML}
-                </ul>
-                <div class="rationale-box" id="rationale-q${q.id}">
-                    <strong>Correct Rationale:</strong> ${q.rationale}<br>
-                    <div class="distractor-analysis"><strong>Distractor Analysis:</strong> ${q.distractorAnalysis}</div>
-                </div>
+        let optionsHTML = '';
+        q.options.forEach((opt, optIdx) => {
+            const isChecked = userAnswers[q.id] === optIdx ? 'checked' : '';
+            optionsHTML += `
+                <li class="option-item">
+                    <label class="option-label">
+                        <input type="radio" name="q${q.id}" value="${optIdx}" ${isChecked} onchange="selectOption(${q.id}, ${optIdx})">
+                        <span><strong>${String.fromCharCode(65 + optIdx)}.</strong> ${opt.text}</span>
+                    </label>
+                </li>
             `;
-            quizContainer.appendChild(questionCard);
         });
+
+        // Tentukan status Rationale untuk soal ini
+        const isSelected = userAnswers[q.id] !== undefined;
+        const selectedOpt = userAnswers[q.id];
+        let rationaleClass = "rationale-box";
+        if (isSelected && !q.options[selectedOpt].isCorrect) {
+            rationaleClass += " incorrect";
+        }
+
+        questionCard.innerHTML = `
+            <div class="question-title">Question ${currentQuestionIndex + 1} of ${rawQuestions.length}: ${q.question}</div>
+            <ul class="options-list">
+                ${optionsHTML}
+            </ul>
+            <div class="${rationaleClass}" id="rationale-box" style="display: none;">
+                <strong>Correct Rationale:</strong> ${q.rationale}<br>
+                <div class="distractor-analysis"><strong>Distractor Analysis:</strong> ${q.distractorAnalysis}</div>
+            </div>
+        `;
+
+        container.appendChild(questionCard);
+
+        // Update tombol navigasi
+        document.getElementById('prev-btn').style.display = currentQuestionIndex === 0 ? 'none' : 'inline-block';
+        
+        const nextBtn = document.getElementById('next-btn');
+        if (currentQuestionIndex === rawQuestions.length - 1) {
+            nextBtn.textContent = 'Finish & Submit Exam';
+        } else {
+            nextBtn.textContent = 'Next';
+        }
+
+        // Reset status tombol Rationale
+        const rationaleBtn = document.getElementById('rationale-btn');
+        rationaleBtn.textContent = 'Show Rationale';
+    }
+
+    function selectOption(questionId, optionIndex) {
+        userAnswers[questionId] = optionIndex;
+    }
+
+    function toggleRationale() {
+        const q = rawQuestions[currentQuestionIndex];
+        const selectedOpt = userAnswers[q.id];
+
+        // Rationale TIDAK BISA dilihat jika belum dijawab/diklik opsinya
+        if (selectedOpt === undefined) {
+            alert("Harap pilih salah satu jawaban terlebih dahulu sebelum melihat rationale / penjelasan.");
+            return;
+        }
+
+        const rationaleBox = document.getElementById('rationale-box');
+        const rationaleBtn = document.getElementById('rationale-btn');
+
+        if (rationaleBox.style.display === 'none' || rationaleBox.style.display === '') {
+            rationaleBox.style.display = 'block';
+            rationaleBtn.textContent = 'Hide Rationale';
+        } else {
+            rationaleBox.style.display = 'none';
+            rationaleBtn.textContent = 'Show Rationale';
+        }
+    }
+
+    function nextQuestion() {
+        if (currentQuestionIndex < rawQuestions.length - 1) {
+            currentQuestionIndex++;
+            renderCurrentQuestion();
+        } else {
+            submitExam();
+        }
+    }
+
+    function prevQuestion() {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            renderCurrentQuestion();
+        }
     }
 
     function startTimer(durationSeconds) {
         let timer = durationSeconds, minutes, seconds;
         const display = document.getElementById('timer');
-        
+
         timerInterval = setInterval(() => {
             minutes = parseInt(timer / 60, 10);
             seconds = parseInt(timer % 60, 10);
@@ -860,29 +566,20 @@
         const total = rawQuestions.length;
 
         rawQuestions.forEach((q) => {
-            const selected = document.querySelector(`input[name="q${q.id}"]:checked`);
-            const rationaleBox = document.getElementById(`rationale-q${q.id}`);
-
-            if (rationaleBox) {
-                rationaleBox.style.display = 'block';
-                if (selected && selected.value === 'true') {
-                    score++;
-                    rationaleBox.classList.remove('incorrect');
-                } else {
-                    rationaleBox.classList.add('incorrect');
-                }
+            const selectedOptIndex = userAnswers[q.id];
+            if (selectedOptIndex !== undefined && q.options[selectedOptIndex].isCorrect) {
+                score++;
             }
         });
 
-        // Assessment Synchronized: Percentage calculation automatic.
         const percentage = Math.round((score / total) * 100);
         const name = document.getElementById('candidate-name').value;
         const id = document.getElementById('candidate-id').value;
 
-        // Hide Exam Controls, Show Results
-        document.getElementById('submit-container').style.display = 'none';
+        document.getElementById('quiz-container').style.display = 'none';
+        document.getElementById('navigation-container').style.display = 'none';
         document.getElementById('timer').style.display = 'none';
-        
+
         const resultsPanel = document.getElementById('results-panel');
         const badgeContainer = document.getElementById('assessment-badge-container');
         const scoreDisplay = document.getElementById('score-text');
@@ -892,26 +589,24 @@
         summaryOutput.innerHTML = `
             <strong>Candidate Name:</strong> ${name}<br>
             <strong>SCFHS Application ID:</strong> ${id}<br>
-            <strong>Examination date:</strong> ${new Date().toLocaleDateString()}<br>
+            <strong>Examination Date:</strong> ${new Date().toLocaleDateString()}<br>
+            <strong>Total Questions:</strong> ${total}<br>
             <strong>Correct Answers:</strong> ${score} / ${total}
         `;
 
         scoreDisplay.textContent = `${percentage}%`;
 
-        // Pass threshold remains 65% standard.
         if (percentage >= 65) {
             badgeContainer.innerHTML = '<span class="assessment-badge status-go">PASS / PASSED</span>';
             detailsDisplay.style.color = 'var(--correct-color)';
-            detailsDisplay.innerHTML = 'Congratulations: You have successfully passed the SCFHS Nursing Technician Assessment threshold and met the required professional competency standard.';
+            detailsDisplay.innerHTML = 'Congratulations: You have successfully passed the SCFHS Nursing Technician Assessment threshold (Minimum 65%).';
         } else {
             badgeContainer.innerHTML = '<span class="assessment-badge status-not-go">FAIL / NOT PASSED</span>';
             detailsDisplay.style.color = 'var(--incorrect-color)';
-            detailsDisplay.innerHTML = 'You did not meet the required minimal passing standard for professional licensure (Ambang Batas 65%). Retake is required.';
+            detailsDisplay.innerHTML = 'You did not meet the required minimal passing standard for professional licensure (Passing Grade 65%). Retake is required.';
         }
 
         resultsPanel.style.display = 'block';
-        
-        // Finalize: Smooth Scroll to Top
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 </script>
